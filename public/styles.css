@@ -1,0 +1,52 @@
+html,
+body {
+  margin: 0;
+  box-sizing: border-box;
+  font-family: 'Comfortaa', cursive;
+}
+
+* {
+  box-sizing: inherit;
+}
+
+body {
+  padding: 0.5rem 0.5rem;
+}
+
+.link {
+  color: black;
+  border: 1px solid black;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.drink-headline {
+}
+
+.drink-thumb {
+  display: block;
+  width: calc(100% + 1rem);
+  margin-left: -0.5rem;
+}
+
+.instructions {
+  line-height: 1.5;
+}
+
+.ingredients-list {
+  list-style-type: none;
+  padding: 0;
+}
+
+.ingredient-item {
+  display: flex;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.ingredient-thumb {
+  margin-right: 1rem;
+  height: 4rem;
+}
