@@ -359,7 +359,7 @@ viewLoadingThumbs drink =
 
 viewDrink : Drink -> Html Msg
 viewDrink drink =
-    div []
+    div [ class "container" ]
         [ a [ class "link", href "/" ] [ text "Another drink plz" ]
         , h1 [ class "drink-headline" ] [ text drink.name ]
         , img [ src drink.thumbUrl, class "drink-thumb" ] []
@@ -375,4 +375,7 @@ viewDrink drink =
                             ]
                     )
             )
+        , div [ class "footer" ]
+            [ a [ class "repo-link", href "https://github.com/axelo/random-drink" ] [ text "github" ]
+            ]
         ]
