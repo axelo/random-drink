@@ -304,7 +304,7 @@ getPageTitle page =
 view : Model -> Browser.Document Msg
 view model =
     Browser.Document (getPageTitle model.page)
-        [ viewPage model.page
+        [ div [ class "container" ] [ viewPage model.page ]
         ]
 
 
@@ -359,7 +359,7 @@ viewLoadingThumbs drink =
 
 viewDrink : Drink -> Html Msg
 viewDrink drink =
-    div [ class "container" ]
+    div []
         [ a [ class "link", href "/" ] [ text "Another drink plz" ]
         , h1 [ class "drink-headline" ] [ text drink.name ]
         , img [ src drink.thumbUrl, class "drink-thumb" ] []
