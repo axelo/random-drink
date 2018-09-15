@@ -1,4 +1,5 @@
 # Random Drink
 
 ## Attribution
-(thecocktaildb)[https://www.thecocktaildb.com/api.php]
+
+[thecocktaildb](https://www.thecocktaildb.com/api.php)
