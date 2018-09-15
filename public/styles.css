@@ -9,13 +9,15 @@ body {
   box-sizing: inherit;
 }
 
-body {
-  padding: 0.5rem 0.5rem;
+.container {
+  max-width: 667px;
+  margin: 0 auto;
 }
 
-.container {
-  max-width: 600px;
-  margin: 0 auto;
+.page {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 78px);
 }
 
 .link {
@@ -25,19 +27,41 @@ body {
   padding: 0.5rem 1rem;
   text-decoration: none;
   display: inline-block;
+  font-size: 1rem;
+  margin: 0 auto;
+  margin-bottom: 0.5rem;
 }
 
 .drink-headline {
+  margin: 0;
+  padding: 0.5rem;
+  flex-shrink: 0;
 }
 
 .drink-thumb {
   display: block;
-  width: calc(100% + 1rem);
-  margin-left: -0.5rem;
+  max-height: 100%;
+  width: 100%;
+  overflow: hidden;
+  object-fit: cover;
 }
 
 .instructions {
   line-height: 1.5;
+  padding: 0 0.5rem;
+}
+
+.ingredients {
+  padding-top: 1rem;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.ingredients-headline {
+  margin: 0;
+  padding: 0.5rem;
 }
 
 .ingredients-list {
@@ -58,6 +82,7 @@ body {
 
 .footer {
   text-align: right;
+  padding: 0.5rem;
 }
 
 .repo-link {

@@ -360,22 +360,30 @@ viewLoadingThumbs drink =
 viewDrink : Drink -> Html Msg
 viewDrink drink =
     div []
-        [ a [ class "link", href "/" ] [ text "Another drink plz" ]
-        , h1 [ class "drink-headline" ] [ text drink.name ]
-        , img [ src drink.thumbUrl, class "drink-thumb" ] []
-        , p [ class "instructions" ] [ text drink.instructions ]
-        , h2 [] [ text "Ingredients" ]
-        , ul [ class "ingredients-list" ]
-            (drink.ingredients
-                |> List.map
-                    (\ingredient ->
-                        li [ class "ingredient-item" ]
-                            [ img [ class "ingredient-thumb", src ingredient.thumbUrl ] []
-                            , text <| ingredient.measure ++ " " ++ ingredient.name
-                            ]
+        [ div [ class "page" ]
+            [ h1 [ class "drink-headline" ] [ text drink.name ]
+            , img [ src drink.thumbUrl, class "drink-thumb" ] []
+            , p [ class "instructions" ] [ text drink.instructions ]
+            , a [ class "link", href "/" ] [ text "Another drink plz" ]
+            ]
+        , div [ class "ingredients" ]
+            [ div []
+                [ h2 [ class "ingredients-headline" ] [ text "Ingredients" ]
+                , ul [ class "ingredients-list" ]
+                    (drink.ingredients
+                        |> List.map
+                            (\ingredient ->
+                                li [ class "ingredient-item" ]
+                                    [ img [ class "ingredient-thumb", src ingredient.thumbUrl ] []
+                                    , text <| ingredient.measure ++ " " ++ ingredient.name
+                                    ]
+                            )
                     )
-            )
-        , div [ class "footer" ]
-            [ a [ class "repo-link", href "https://github.com/axelo/random-drink" ] [ text "github" ]
+                ]
+            , div []
+                [ div [ class "footer" ]
+                    [ a [ class "repo-link", href "https://github.com/axelo/random-drink" ] [ text "github" ]
+                    ]
+                ]
             ]
         ]
