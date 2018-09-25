@@ -7,7 +7,7 @@
   "private": true,
   "scripts": {
     "start": "serve --single ./public",
-    "start:dev": "elm-live --pushstate --dir public src/Main.elm -- --output=public/bundle.js --debug",
+    "start:dev": "elm-live --port 3000 --pushstate --dir public src/Main.elm -- --output=public/bundle.js --debug",
     "build": "elm make src/Main.elm --optimize --output=public/bundle.js"
   },
   "devDependencies": {

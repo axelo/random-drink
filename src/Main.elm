@@ -11,7 +11,6 @@ import Json.Decode as D
 import Url exposing (Url)
 
 
-
 -- Main
 
 
@@ -126,12 +125,10 @@ update msg model =
                             remoteDrink =
                                 if allThumbsLoaded then
                                     Success drink
-
                                 else
                                     LoadingThumbs drink (nbOfLoadedThumbs + 1)
                         in
                         ( { model | page = PageDrink remoteDrink }, Cmd.none )
-
                     else
                         ( model, Cmd.none )
 
@@ -147,7 +144,6 @@ changePage url model =
     in
     if parsedDrinkId == currentDrinkId model.page then
         ( model, Cmd.none )
-
     else
         case parsedDrinkId of
             Just id ->
@@ -229,7 +225,6 @@ decodeDrinks =
             (\maybeDrinks ->
                 if maybeDrinks == Nothing then
                     D.succeed Nothing
-
                 else
                     D.maybe decodeDrink
             )
@@ -267,7 +262,6 @@ decodeDrink =
                 in
                 if id == "" then
                     D.fail "Missing id"
-
                 else
                     D.succeed
                         { id = id
