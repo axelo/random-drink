@@ -6,13 +6,14 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "start": "serve --single ./public",
+    "start": "npm run build && serve --single ./dist",
     "start:dev": "elm-live --port 3000 --pushstate --dir public src/Main.elm -- --output=public/bundle.js --debug",
-    "build": "elm make src/Main.elm --optimize --output=public/bundle.js"
+    "build": "elm make src/Main.elm --optimize --output=dist/bundle.min.js && uglifyjs dist/bundle.min.js --compress 'pure_funcs=\"F2,F3,F4,F5,F6,F7,F8,F9,A2,A3,A4,A5,A6,A7,A8,A9\",pure_getters,keep_fargs=false,unsafe_comps,unsafe' | uglifyjs --mangle --output=dist/bundle.min.js && sed \"s/bundle.js/bundle.min.js/\" public/index.html > dist/index.html"
   },
   "devDependencies": {
     "elm": "^0.19.0-bugfix2",
-    "elm-live": "^3.0.4"
+    "elm-live": "^3.0.4",
+    "uglify-js": "^3.4.9"
   },
   "dependencies": {
     "serve": "^10.0.1"

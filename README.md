@@ -2,6 +2,10 @@
 
 [Get one here](https://randomdrink.now.sh)
 
-## Attribution
+## Attributions
 
-[thecocktaildb](https://www.thecocktaildb.com/api.php)
+All the data belongs to [thecocktaildb](https://www.thecocktaildb.com/api.php), thanks!
+
+Icons made by [Freepik](http://www.freepik.com) from [www.flaticon.com](https://www.flaticon.com/) and is licensed by [CC 3.0 BY](http://creativecommons.org/licenses/by/3.0/)
+
+Github svg icon from [simpleicons.org](https://simpleicons.org/)

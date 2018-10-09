@@ -1,4 +1,5 @@
 node_modules
 elm-stuff
-public/bundle.js
+bundle.js
+bundle.min.js
 .DS_Store
