@@ -1,10 +1,11 @@
 module Main exposing (main)
 
+import Array exposing (Array)
 import Browser
 import Browser.Navigation as Nav
 import Dict exposing (Dict)
-import Html exposing (Html, a, button, div, h1, h2, header, img, li, main_, nav, p, section, text, ul)
-import Html.Attributes exposing (class, href, src, style)
+import Html exposing (Html, a, button, div, h1, h2, header, img, li, main_, nav, p, section, span, text, ul)
+import Html.Attributes exposing (class, disabled, href, src, style)
 import Html.Events exposing (on, onClick)
 import Http
 import Json.Decode as D
@@ -36,7 +37,8 @@ main =
 type alias Model =
     { navKey : Nav.Key
     , route : Route
-    , drinks : Dict String RemoteDrink
+    , drinks : Dict DrinkId RemoteDrink
+    , drinkIdRouteHistory : List DrinkId
     }
 
 
@@ -46,8 +48,8 @@ type DrinkSection
 
 
 type Route
-    = HomeRoute
-    | DrinkOverview DrinkSection String
+    = RandomDrinkRoute (Maybe String)
+    | DrinkRoute DrinkSection DrinkId
     | NotFoundRoute
 
 
@@ -58,8 +60,12 @@ type RemoteDrink
     | Failure String
 
 
+type alias DrinkId =
+    String
+
+
 type alias Drink =
-    { id : String
+    { id : DrinkId
     , name : String
     , thumbUrl : String
     , instructions : String
@@ -81,7 +87,12 @@ type alias Ingredient =
 
 init : () -> Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
-    changePage url { navKey = navKey, route = HomeRoute, drinks = Dict.empty }
+    changePage url
+        { navKey = navKey
+        , route = RandomDrinkRoute Nothing
+        , drinks = Dict.empty
+        , drinkIdRouteHistory = []
+        }
 
 
 
@@ -91,6 +102,8 @@ init _ url navKey =
 type Msg
     = UrlChanged Url
     | LinkClicked Browser.UrlRequest
+    | GotoPreviousDrink
+    | GotoNextDrink
     | GotDrink String (Result Http.Error (Maybe Drink))
     | GotRandomDrink (Result Http.Error (Maybe Drink))
     | GotDrinkThumbImage String
@@ -110,25 +123,104 @@ update msg model =
         UrlChanged url ->
             changePage url model
 
+        GotoPreviousDrink ->
+            let
+                backCmd =
+                    case model.route of
+                        DrinkRoute currentSection currentDrinkId ->
+                            let
+                                maybePrevDrinkId =
+                                    let
+                                        history =
+                                            model.drinkIdRouteHistory
+                                                |> Array.fromList
+                                    in
+                                    case findIndexOf 0 currentDrinkId history of
+                                        Just i ->
+                                            Array.get (i + 1) history
+
+                                        Nothing ->
+                                            Nothing
+                            in
+                            case maybePrevDrinkId of
+                                Just prevDrinkId ->
+                                    DrinkRoute currentSection prevDrinkId
+                                        |> toHref
+                                        |> Nav.pushUrl model.navKey
+
+                                Nothing ->
+                                    Cmd.none
+
+                        _ ->
+                            Cmd.none
+            in
+            ( model, backCmd )
+
+        GotoNextDrink ->
+            let
+                nextCmd =
+                    case model.route of
+                        DrinkRoute currentSection currentDrinkId ->
+                            let
+                                maybeNextDrinkId =
+                                    let
+                                        history =
+                                            model.drinkIdRouteHistory
+                                                |> Array.fromList
+                                    in
+                                    case findIndexOf 0 currentDrinkId history of
+                                        Just i ->
+                                            Array.get (i - 1) history
+
+                                        Nothing ->
+                                            Nothing
+                            in
+                            case maybeNextDrinkId of
+                                Just nextDrinkId ->
+                                    DrinkRoute currentSection nextDrinkId
+                                        |> toHref
+                                        |> Nav.pushUrl model.navKey
+
+                                Nothing ->
+                                    RandomDrinkRoute Nothing
+                                        |> toHref
+                                        |> Nav.pushUrl model.navKey
+
+                        RandomDrinkRoute (Just failure) ->
+                            RandomDrinkRoute Nothing
+                                |> toHref
+                                |> Nav.pushUrl model.navKey
+
+                        _ ->
+                            Cmd.none
+            in
+            ( model, nextCmd )
+
         GotRandomDrink result ->
             case result of
                 Ok (Just drink) ->
-                    let
-                        nextModel =
-                            { model | drinks = Dict.insert drink.id (LoadingThumbs drink 0) model.drinks }
+                    case model.route of
+                        RandomDrinkRoute _ ->
+                            ( { model | drinks = Dict.insert drink.id (LoadingThumbs drink 0) model.drinks }
+                            , DrinkRoute OverviewSection drink.id
+                                |> toHref
+                                |> Nav.replaceUrl model.navKey
+                            )
 
-                        nextCmd =
-                            case model.route of
-                                DrinkOverview _ "random" ->
-                                    Nav.replaceUrl model.navKey (toHref (DrinkOverview OverviewSection drink.id))
-
-                                _ ->
-                                    Cmd.none
-                    in
-                    ( nextModel, nextCmd )
+                        _ ->
+                            ( model, Cmd.none )
 
                 _ ->
-                    ( { model | drinks = Dict.insert "random" (Failure "dayum") model.drinks }, Cmd.none )
+                    let
+                        nextRoute =
+                            case model.route of
+                                RandomDrinkRoute _ ->
+                                    RandomDrinkRoute (Just "Couldn't get random drink :/")
+
+                                _ ->
+                                    model.route
+                    in
+                    ( { model | route = nextRoute }, Cmd.none )
 
         GotDrink id result ->
             case result of
@@ -136,10 +228,10 @@ update msg model =
                     ( { model | drinks = Dict.insert id (LoadingThumbs drink 0) model.drinks }, Cmd.none )
 
                 Ok Nothing ->
-                    ( { model | drinks = Dict.insert id (Failure "Not found yo") model.drinks }, Cmd.none )
+                    ( { model | drinks = Dict.insert id (Failure "Drink not found") model.drinks }, Cmd.none )
 
                 Err _ ->
-                    ( { model | drinks = Dict.insert id (Failure "dayum") model.drinks }, Cmd.none )
+                    ( { model | drinks = Dict.insert id (Failure "Could not get drink") model.drinks }, Cmd.none )
 
         GotDrinkThumbImage id ->
             let
@@ -165,9 +257,9 @@ update msg model =
 routeParser : P.Parser (Route -> a) a
 routeParser =
     P.oneOf
-        [ P.map HomeRoute P.top
-        , P.map (DrinkOverview OverviewSection) (P.s "drink" </> P.string)
-        , P.map (DrinkOverview InstructionsSection) (P.s "drink" </> P.string </> P.s "instructions")
+        [ P.map (RandomDrinkRoute Nothing) P.top
+        , P.map (DrinkRoute OverviewSection) (P.s "drink" </> P.string)
+        , P.map (DrinkRoute InstructionsSection) (P.s "drink" </> P.string </> P.s "instructions")
         ]
 
 
@@ -184,10 +276,10 @@ parseUrl url =
 toHref : Route -> String
 toHref route =
     case route of
-        HomeRoute ->
+        RandomDrinkRoute _ ->
             "/"
 
-        DrinkOverview section id ->
+        DrinkRoute section id ->
             case section of
                 OverviewSection ->
                     "/drink/" ++ id
@@ -205,33 +297,63 @@ changePage url model =
         nextRoute =
             parseUrl url
 
-        nextCmd =
+        drinkIdRouteHistory =
             case nextRoute of
-                DrinkOverview _ "random" ->
-                    sendGetRandomDrink
+                DrinkRoute _ drinkId ->
+                    let
+                        history =
+                            case model.route of
+                                RandomDrinkRoute _ ->
+                                    -- If we got a random drink that we already have
+                                    -- shown, forget the last history
+                                    List.filter (\id -> id /= drinkId) model.drinkIdRouteHistory
 
-                DrinkOverview section id ->
-                    case Dict.get id model.drinks of
-                        Just (Failure _) ->
-                            sendGetDrinkById id
+                                _ ->
+                                    model.drinkIdRouteHistory
+                    in
+                    if List.member drinkId model.drinkIdRouteHistory then
+                        history
 
-                        Nothing ->
-                            sendGetDrinkById id
-
-                        _ ->
-                            Cmd.none
+                    else
+                        drinkId :: history
 
                 _ ->
-                    Cmd.none
+                    model.drinkIdRouteHistory
+
+        ( drinks, nextCmd ) =
+            case nextRoute of
+                RandomDrinkRoute _ ->
+                    ( model.drinks, sendGetRandomDrink )
+
+                DrinkRoute section id ->
+                    case Dict.get id model.drinks of
+                        Just (Failure _) ->
+                            -- Try again
+                            ( Dict.insert id Loading model.drinks, sendGetDrinkById id )
+
+                        Nothing ->
+                            ( model.drinks, sendGetDrinkById id )
+
+                        _ ->
+                            ( model.drinks, Cmd.none )
+
+                _ ->
+                    ( model.drinks, Cmd.none )
     in
-    ( { model | route = nextRoute }, nextCmd )
+    ( { model
+        | route = nextRoute
+        , drinks = drinks
+        , drinkIdRouteHistory = drinkIdRouteHistory
+      }
+    , nextCmd
+    )
 
 
 
 -- Commands
 
 
-sendGetDrinkById : String -> Cmd Msg
+sendGetDrinkById : DrinkId -> Cmd Msg
 sendGetDrinkById id =
     getDrinkById id |> Http.send (GotDrink id)
 
@@ -245,7 +367,7 @@ sendGetRandomDrink =
 -- Requests
 
 
-getDrinkById : String -> Http.Request (Maybe Drink)
+getDrinkById : DrinkId -> Http.Request (Maybe Drink)
 getDrinkById id =
     let
         url =
@@ -329,9 +451,38 @@ decodeDrink =
 -- Helpers
 
 
+findIndexOf : Int -> a -> Array a -> Maybe Int
+findIndexOf i val arr =
+    case Array.get i arr of
+        Just currVal ->
+            if currVal == val then
+                Just i
+
+            else
+                findIndexOf (i + 1) val arr
+
+        Nothing ->
+            Nothing
+
+
+canGotoPrevDrink : Route -> List DrinkId -> Bool
+canGotoPrevDrink currentRoute drinkIdRouteHistory =
+    List.length drinkIdRouteHistory
+        > 1
+        && (case currentRoute of
+                DrinkRoute _ currentDrinkId ->
+                    Just currentDrinkId /= (List.reverse drinkIdRouteHistory |> List.head)
+
+                _ ->
+                    -- We uses current route drink id to be our current history position
+                    -- and here we have no drink id to go on
+                    False
+           )
+
+
 currentDrinkName default route drinks =
     case route of
-        DrinkOverview _ id ->
+        DrinkRoute _ id ->
             case Dict.get id drinks of
                 Just (LoadingThumbs drink _) ->
                     drink.name
@@ -365,18 +516,32 @@ view model =
         [ viewApp model ]
 
 
+viewApp : Model -> Html Msg
+viewApp model =
+    main_ [ class "font-sans h-full flex flex-col text-grey-darkest" ]
+        [ viewTopBar (currentDrinkName "Preparing drink.." model.route model.drinks) (canGotoPrevDrink model.route model.drinkIdRouteHistory)
+        , viewRoute model
+        , viewTabNav model.route
+        ]
+
+
 viewRoute : Model -> Html Msg
 viewRoute { route, drinks } =
     let
         viewContent =
             case route of
-                HomeRoute ->
-                    div [] [ a [ href (toHref <| DrinkOverview OverviewSection "random") ] [ text "Get random drink" ] ]
-
                 NotFoundRoute ->
                     div [] [ text "Oops, drink not found" ]
 
-                DrinkOverview section id ->
+                RandomDrinkRoute maybeFailure ->
+                    case maybeFailure of
+                        Just failure ->
+                            viewRandomDrinkFailed failure
+
+                        Nothing ->
+                            viewRandomDrink
+
+                DrinkRoute section id ->
                     let
                         remoteDrink =
                             Maybe.withDefault Loading (Dict.get id drinks)
@@ -396,23 +561,45 @@ viewRoute { route, drinks } =
         ]
 
 
+viewRandomDrink =
+    viewRemoteDrink Loading (\_ -> text "")
+
+
+viewRandomDrinkFailed failure =
+    div [] [ text failure ]
+
+
 viewRemoteDrink remoteDrink viewWhenSuccess =
-    case remoteDrink of
-        Loading ->
-            viewLoading
+    let
+        spinner =
+            case remoteDrink of
+                Loading ->
+                    viewSpinner
 
-        LoadingThumbs drink _ ->
-            viewLoadingThumbs drink
+                LoadingThumbs _ _ ->
+                    viewSpinner
 
-        Success drink ->
-            viewWhenSuccess drink
+                _ ->
+                    text ""
 
-        Failure _ ->
-            div [] [ text "Couldn't get the specific drink :/" ]
+        content =
+            case remoteDrink of
+                Loading ->
+                    text ""
 
+                LoadingThumbs drink _ ->
+                    viewLoadingThumbs drink
 
-viewLoading =
-    div [] [ text <| "Please wait.." ]
+                Success drink ->
+                    viewWhenSuccess drink
+
+                Failure _ ->
+                    div [] [ text "Couldn't get the specific drink :/" ]
+    in
+    div [ class "h-full relative" ]
+        [ spinner -- Always render spinner so we dont restart animation on state transitions
+        , content
+        ]
 
 
 viewLoadingThumbs : Drink -> Html Msg
@@ -424,11 +611,7 @@ viewLoadingThumbs drink =
         images =
             List.map (\url -> img [ on "load" (D.succeed <| GotDrinkThumbImage drink.id), src url ] []) thumbUrls
     in
-    div []
-        [ text ("Preparing drink " ++ drink.name ++ "..")
-        , div [ style "display" "none" ]
-            images
-        ]
+    div [ style "display" "none" ] images
 
 
 viewDrink : Drink -> Html Msg
@@ -444,26 +627,38 @@ viewDrinkInstructions drink =
                 |> List.map
                     (\ingredient ->
                         li [ class "flex items-center py-2" ]
-                            [ img [ class "block mr-1", src ingredient.thumbUrl ] []
+                            [ img [ class "block h-24 mr-1", src ingredient.thumbUrl ] []
                             , text <| ingredient.measure ++ " " ++ ingredient.name
                             ]
                     )
             )
-        , div [ class "m-2 whitespace-pre-wrap leading-normal" ] [ text drink.instructions ]
+        , div [ class "m-2 mb-8 whitespace-pre-wrap leading-normal" ] [ text drink.instructions ]
         ]
 
 
-viewApp : Model -> Html Msg
-viewApp model =
-    main_ [ class "font-sans h-full flex flex-col text-grey-darkest" ]
-        [ viewTopBar (currentDrinkName "Random Drink" model.route model.drinks)
-        , viewRoute model
-        , viewTabNav model.route
+viewTopNav prevEnabled =
+    div [ class "flex justify-between m-1 text-sm" ]
+        [ button
+            [ class
+                (if not prevEnabled then
+                    "cursor-default text-grey"
+
+                 else
+                    "text-blue-dark"
+                )
+            , disabled (not prevEnabled)
+            , onClick GotoPreviousDrink
+            ]
+            [ text "< Prev" ]
+        , button [ class "text-blue-dark", onClick GotoNextDrink ] [ text "Next >" ]
         ]
 
 
-viewTopBar caption =
-    header [ class "flex-no-shrink py-4 text-2xl text-center border-b border-grey-light" ] [ text caption ]
+viewTopBar caption prevEnabled =
+    header [ class "flex-no-shrink pb-1 text-2xl text-center truncate border-b border-grey-light" ]
+        [ viewTopNav prevEnabled
+        , text caption
+        ]
 
 
 viewTabNav : Route -> Html msg
@@ -471,7 +666,7 @@ viewTabNav currentRoute =
     let
         maybeCurrentDrinkId =
             case currentRoute of
-                DrinkOverview _ id ->
+                DrinkRoute _ id ->
                     Just id
 
                 _ ->
@@ -489,7 +684,7 @@ viewTabNav currentRoute =
             let
                 active =
                     case currentRoute of
-                        DrinkOverview currentSection _ ->
+                        DrinkRoute currentSection _ ->
                             section == currentSection
 
                         _ ->
@@ -501,7 +696,7 @@ viewTabNav currentRoute =
                 url =
                     case maybeCurrentDrinkId of
                         Just id ->
-                            toHref (DrinkOverview section id)
+                            toHref (DrinkRoute section id)
 
                         Nothing ->
                             ""
@@ -527,6 +722,10 @@ viewTabNav currentRoute =
         ]
 
 
+viewSpinner =
+    div [ class "flex h-full items-center justify-center" ] [ viewSvgSpinner ]
+
+
 
 -- Svgs
 
@@ -541,3 +740,74 @@ viewSvgInstructions =
 
 viewSvgRepo =
     svg [ SvgAttr.viewBox "0 0 24 24", SvgAttr.class "h-8 mb-1" ] [ Svg.path [ SvgAttr.fill "currentColor", SvgAttr.stroke "none", SvgAttr.d "M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.4-1.8-1.4-1.8-1-.7.1-.7.1-.7 1.2 0 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.6 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3" ] [] ]
+
+
+viewSvgSpinner =
+    svg
+        [ SvgAttr.viewBox "0 0 44 44"
+        , SvgAttr.class "h-32"
+        , SvgAttr.stroke "currentColor"
+        ]
+        [ Svg.g
+            [ SvgAttr.fill "none"
+            , SvgAttr.fillRule "evenodd"
+            , SvgAttr.strokeWidth "2"
+            ]
+            [ Svg.circle
+                [ SvgAttr.cx "22"
+                , SvgAttr.cy "22"
+                , SvgAttr.r "1"
+                ]
+                [ Svg.animate
+                    [ SvgAttr.attributeName "r"
+                    , SvgAttr.begin "0s"
+                    , SvgAttr.dur "1.8s"
+                    , SvgAttr.values "1; 20"
+                    , SvgAttr.calcMode "spline"
+                    , SvgAttr.keyTimes "0; 1"
+                    , SvgAttr.keySplines "0.165, 0.84, 0.44, 1"
+                    , SvgAttr.repeatCount "indefinite"
+                    ]
+                    []
+                , Svg.animate
+                    [ SvgAttr.attributeName "stroke-opacity"
+                    , SvgAttr.begin "0s"
+                    , SvgAttr.dur "1.8s"
+                    , SvgAttr.values "1; 0"
+                    , SvgAttr.calcMode "spline"
+                    , SvgAttr.keyTimes "0; 1"
+                    , SvgAttr.keySplines "0.3, 0.61, 0.355, 1"
+                    , SvgAttr.repeatCount "indefinite"
+                    ]
+                    []
+                ]
+            , Svg.circle
+                [ SvgAttr.cx "22"
+                , SvgAttr.cy "22"
+                , SvgAttr.r "1"
+                ]
+                [ Svg.animate
+                    [ SvgAttr.attributeName "r"
+                    , SvgAttr.begin "-0.9s"
+                    , SvgAttr.dur "1.8s"
+                    , SvgAttr.values "1; 20"
+                    , SvgAttr.calcMode "spline"
+                    , SvgAttr.keyTimes "0; 1"
+                    , SvgAttr.keySplines "0.165, 0.84, 0.44, 1"
+                    , SvgAttr.repeatCount "indefinite"
+                    ]
+                    []
+                , Svg.animate
+                    [ SvgAttr.attributeName "stroke-opacity"
+                    , SvgAttr.begin "-0.9s"
+                    , SvgAttr.dur "1.8s"
+                    , SvgAttr.values "1; 0"
+                    , SvgAttr.calcMode "spline"
+                    , SvgAttr.keyTimes "0; 1"
+                    , SvgAttr.keySplines "0.3, 0.61, 0.355, 1"
+                    , SvgAttr.repeatCount "indefinite"
+                    ]
+                    []
+                ]
+            ]
+        ]
